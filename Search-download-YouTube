@@ -1,0 +1,567 @@
+/*╭━━━〔 CREDITS FOR 𝙎𝙃𝘼𝙉𝙆𝙎〕━━━╮
+│ 👑 الـمـطـور ↜ 𝙎𝙃𝘼𝙉𝙆𝙎
+│ 🌾 قــنــاة الــمــطـور ↜https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y 
+╰━━━━━━━━━━━━━━━━━━╯
+*/
+
+import { generateWAMessageFromContent } from '@whiskeysockets/baileys'
+import axios from 'axios'
+import fs from 'fs/promises'
+import { createWriteStream } from 'fs'
+import os from 'os'
+import path from 'path'
+import crypto from 'crypto'
+import { spawn } from 'child_process'
+import { pipeline } from 'stream/promises'
+
+const API_BASE = 'https://engez.a7a.online/api/v1'
+const YT_SEARCH = `${API_BASE}/search/youtube`
+const YT_DOWNLOAD_V2 = `${API_BASE}/download/youtubev2`
+const YT_DOWNLOAD_NEW = `${API_BASE}/download/ytdl`
+const YT_DOWNLOAD_OLD = `${API_BASE}/download/youtube`
+
+const SEP = '|'
+const DOWNLOAD_TIMEOUT_MS = 120 * 1000
+
+const VIDEO_QUALITIES = ['144', '240', '360', '480', '720', '1080', '1440', '2160']
+const AUDIO_QUALITIES = ['128', '320']
+
+function normalizeDownloadUrl(value) {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    return /^https?:\/\//i.test(trimmed) ? trimmed : null
+}
+
+function normalizePayload(payload) {
+    return {
+        title: payload?.title || null,
+        thumbnail: payload?.thumbnail || null,
+        download_url: normalizeDownloadUrl(payload?.download_url || payload?.downloadUrl),
+        type: payload?.type === 'audio' || payload?.type === 'mp3' ? 'audio' : 'mp4',
+        requested_quality: payload?.requested_quality || payload?.quality || null,
+        file_size_bytes: payload?.file_size_bytes || payload?.fileSizeBytes || null,
+        source_used: payload?.source_used || payload?.source || 'unknown',
+        is_fallback: Boolean(payload?.is_fallback)
+    }
+}
+
+async function searchYouTube(query) {
+    try {
+        const params = new URLSearchParams({ q: query })
+        const response = await axios.get(`${YT_SEARCH}?${params.toString()}`, {
+            timeout: 30000
+        })
+
+        if (!response.data?.success) {
+            throw new Error(response.data?.error || 'فشل البحث')
+        }
+
+        return response.data.results || []
+    } catch (error) {
+        throw new Error(error?.response?.data?.error || error.message || 'فشل الاتصال')
+    }
+}
+
+async function fetchFromV2(url, type) {
+    const params = new URLSearchParams({ url, type })
+
+    const { data } = await axios.get(`${YT_DOWNLOAD_V2}?${params.toString()}`, {
+        timeout: DOWNLOAD_TIMEOUT_MS
+    })
+
+    if (!data?.success || !data.response) {
+        throw new Error(data?.error || 'تعذر التحميل السريع')
+    }
+
+    const r = data.response
+    const payload = normalizePayload({
+        title: r.title,
+        thumbnail: r.thumbnail,
+        download_url: r.download_url || r.downloadUrl,
+        type: r.type,
+        requested_quality: r.requested_quality || r.quality,
+        file_size_bytes: r.file_size_bytes || r.fileSizeBytes,
+        source_used: r.source || 'youtubev2'
+    })
+
+    if (!payload.download_url) {
+        throw new Error('API لم ترجع رابط تحميل صالح')
+    }
+
+    return payload
+}
+
+function buildNewApiUrl(url, type, quality) {
+    const params = new URLSearchParams({ url })
+    if (type) params.set('type', type)
+    if (quality) params.set('quality', quality)
+    return `${YT_DOWNLOAD_NEW}?${params.toString()}`
+}
+
+function buildOldApiUrl(url, type, quality) {
+    const params = new URLSearchParams({ url })
+    if (type) params.set('type', type)
+    if (quality) params.set('quality', quality)
+    return `${YT_DOWNLOAD_OLD}?${params.toString()}`
+}
+
+async function fetchFromNewApi(url, type, quality) {
+    const { data } = await axios.get(buildNewApiUrl(url, type, quality), {
+        timeout: DOWNLOAD_TIMEOUT_MS
+    })
+
+    if (!data?.success || !data.response) {
+        throw new Error(data?.error || 'تعذر تحميل هذا الاختيار من المصدر الرئيسي')
+    }
+
+    const r = data.response
+    const payload = normalizePayload({
+        title: r.title,
+        thumbnail: r.thumbnail,
+        download_url: r.download_url || r.downloadUrl,
+        type: r.type,
+        requested_quality: r.requested_quality || r.quality || quality,
+        file_size_bytes: r.file_size_bytes || r.fileSizeBytes,
+        source_used: r.source || 'ytdl'
+    })
+
+    if (!payload.download_url) {
+        throw new Error('المصدر الرئيسي لم يرجع رابط تحميل صالح')
+    }
+
+    return payload
+}
+
+async function fetchFromOldApi(url, type, quality) {
+    const { data } = await axios.get(buildOldApiUrl(url, type, quality), {
+        timeout: DOWNLOAD_TIMEOUT_MS
+    })
+
+    if (!data?.success) {
+        throw new Error(data?.error || 'تعذر تحميل هذا الاختيار من المصدر الاحتياطي')
+    }
+
+    const d = data.data || data.response || {}
+    const payload = normalizePayload({
+        title: d.title,
+        thumbnail: d.thumbnail,
+        download_url: d.download_url || d.downloadUrl,
+        type: d.type,
+        requested_quality: d.requested_quality || d.quality || quality,
+        file_size_bytes: d.file_size_bytes || d.fileSizeBytes,
+        source_used: d.source || 'youtube',
+        is_fallback: true
+    })
+
+    if (!payload.download_url) {
+        throw new Error('المصدر الاحتياطي لم يرجع رابط تحميل صالح')
+    }
+
+    return payload
+}
+
+async function fetchFromFallbackChain(url, type, quality) {
+    try {
+        return await fetchFromNewApi(url, type, quality)
+    } catch (e) {
+        console.error('ytdl فشل، بجرب youtube:', e?.message || e)
+        return await fetchFromOldApi(url, type, quality)
+    }
+}
+
+async function downloadToFile(fileUrl, filePath) {
+    const safeUrl = normalizeDownloadUrl(fileUrl)
+    if (!safeUrl) {
+        throw new Error('ERR_INVALID_URL')
+    }
+
+    const response = await axios.get(safeUrl, {
+        responseType: 'stream',
+        timeout: DOWNLOAD_TIMEOUT_MS,
+        maxRedirects: 5,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+            Accept: '*/*',
+            'Accept-Language': 'en-US,en;q=0.9'
+        }
+    })
+
+    await pipeline(response.data, createWriteStream(filePath))
+}
+
+function runFfmpeg(args) {
+    return new Promise((resolve, reject) => {
+        const ff = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] })
+        let err = ''
+
+        ff.stderr.on('data', (chunk) => {
+            err += chunk.toString()
+        })
+
+        ff.on('error', reject)
+
+        ff.on('close', (code) => {
+            if (code === 0) return resolve()
+            reject(new Error(`ffmpeg exited with code ${code}\n${err}`))
+        })
+    })
+}
+
+async function repairVideoWithFfmpeg(inputPath, outputPath) {
+    try {
+        await runFfmpeg([
+            '-y', '-i', inputPath,
+            '-fflags', '+genpts',
+            '-movflags', '+faststart',
+            '-map', '0:v:0?',
+            '-map', '0:a:0?',
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-pix_fmt', 'yuv420p',
+            outputPath
+        ])
+        return outputPath
+    } catch (e) {
+        console.error('repairVideoWithFfmpeg re-encode فشل:', e?.message || e)
+        await runFfmpeg([
+            '-y', '-i', inputPath,
+            '-c', 'copy',
+            '-movflags', '+faststart',
+            outputPath
+        ])
+        return outputPath
+    }
+}
+
+async function convertAudioWithFfmpeg(inputPath, outputPath) {
+    try {
+        await runFfmpeg([
+            '-y', '-i', inputPath,
+            '-vn',
+            '-c:a', 'libmp3lame',
+            '-b:a', '192k',
+            outputPath
+        ])
+        return outputPath
+    } catch (e) {
+        console.error('convertAudioWithFfmpeg فشل:', e?.message || e)
+        await runFfmpeg([
+            '-y', '-i', inputPath,
+            '-vn',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            outputPath
+        ])
+        return outputPath
+    }
+}
+
+async function prepareMediaFile(payload) {
+    const safePayload = normalizePayload(payload)
+    if (!safePayload.download_url) {
+        throw new Error('API لم ترجع رابط تحميل صالح')
+    }
+
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ytdl-'))
+    const id = crypto.randomBytes(6).toString('hex')
+
+    const srcPath = path.join(tmpDir, `source-${id}.bin`)
+    const videoPath = path.join(tmpDir, `video-${id}.mp4`)
+    const audioPath = path.join(tmpDir, `audio-${id}.mp3`)
+
+    await downloadToFile(safePayload.download_url, srcPath)
+
+    const isVideo = safePayload.type === 'mp4'
+
+    if (isVideo) {
+        try {
+            await repairVideoWithFfmpeg(srcPath, videoPath)
+            return { filePath: videoPath, tmpDir, mimetype: 'video/mp4' }
+        } catch (e) {
+            console.error('video ffmpeg فشل، هبعت الملف الأصلي:', e?.message || e)
+            return { filePath: srcPath, tmpDir, mimetype: 'video/mp4' }
+        }
+    }
+
+    try {
+        await convertAudioWithFfmpeg(srcPath, audioPath)
+        return { filePath: audioPath, tmpDir, mimetype: 'audio/mpeg' }
+    } catch (e) {
+        console.error('audio ffmpeg فشل، هبعت الملف الأصلي:', e?.message || e)
+        return { filePath: srcPath, tmpDir, mimetype: 'audio/mpeg' }
+    }
+}
+
+async function sendDownloadedMedia(conn, chat, payload, quoted) {
+    const safePayload = normalizePayload(payload)
+    const isVideo = safePayload.type === 'mp4'
+    const fallbackNote = safePayload.is_fallback ? '\nملحوظة: تم استخدام مصدر بديل' : ''
+    const title = safePayload.title || 'بدون عنوان'
+
+    let prepared
+    try {
+        prepared = await prepareMediaFile(safePayload)
+        const buffer = await fs.readFile(prepared.filePath)
+
+        if (isVideo) {
+            await conn.sendMessage(chat, {
+                video: buffer,
+                mimetype: 'video/mp4',
+                caption: `تم التحميل بنجاح بواسطة SHANKS\nالعنوان: ${title}\nالجودة: ${safePayload.requested_quality || 'auto'}\nالمصدر: ${safePayload.source_used || 'unknown'}${fallbackNote}`
+            }, { quoted })
+        } else {
+            await conn.sendMessage(chat, {
+                audio: buffer,
+                mimetype: 'audio/mpeg',
+                ptt: false
+            }, { quoted })
+
+            await conn.sendMessage(chat, {
+                text: `تم التحميل بنجاح بواسطة SHANKS\nالعنوان: ${title}\nالجودة: ${safePayload.requested_quality || 'auto'}\nالمصدر: ${safePayload.source_used || 'unknown'}${fallbackNote}`
+            }, { quoted })
+        }
+    } catch (e) {
+        console.error('sendDownloadedMedia error:', e)
+        const status = e?.response?.status
+        const statusText = e?.response?.statusText
+        const reason = status
+            ? `الخادم رفض الطلب (${status}${statusText ? ' - ' + statusText : ''})`
+            : (e?.code || e?.message || 'سبب غير معروف')
+
+        await conn.sendMessage(chat, {
+            text: `فشل تحميل الملف.\n\nالسبب: ${reason}\n\nحاول تختار جودة تانية أو ابعت الرابط من جديد.`
+        }, { quoted })
+    } finally {
+        if (prepared?.tmpDir) {
+            await fs.rm(prepared.tmpDir, { recursive: true, force: true }).catch(() => {})
+        }
+    }
+}
+
+async function sendQuickChoiceButtons(conn, chat, quoted, usedPrefix, command, videoId, title) {
+    const titleLine = title ? `\nالعنوان: ${title}` : ''
+
+    const buttons = [
+        {
+            buttonId: `${usedPrefix}${command} ${videoId}${SEP}quick${SEP}audio`,
+            buttonText: { displayText: '🎵 صوت سريع' },
+            type: 1
+        },
+        {
+            buttonId: `${usedPrefix}${command} ${videoId}${SEP}quick${SEP}video`,
+            buttonText: { displayText: '🎬 فيديو سريع' },
+            type: 1
+        },
+        {
+            buttonId: `${usedPrefix}${command} ${videoId}${SEP}fallback`,
+            buttonText: { displayText: '⚙️ جودات احتياطية' },
+            type: 1
+        }
+    ]
+
+    const contentMsg = {
+        contentText: `اختر طريقة التحميل:${titleLine}`,
+        footerText: '© ʙʏ 𝙎𝙃𝘼𝙉𝙆𝙎',
+        buttons,
+        headerType: 1
+    }
+
+    const waMsg = generateWAMessageFromContent(chat, { buttonsMessage: contentMsg }, { quoted })
+    await conn.relayMessage(chat, waMsg.message, { messageId: waMsg.key.id })
+}
+
+function buildQualityRows(usedPrefix, command, videoId) {
+    const videoRows = VIDEO_QUALITIES.map((q) => ({
+        header: 'فيديو',
+        title: `${q}p`,
+        description: `تحميل فيديو بجودة ${q}p`,
+        id: `${usedPrefix}${command} ${videoId}${SEP}video${SEP}${q}`
+    }))
+
+    const audioRows = AUDIO_QUALITIES.map((q) => ({
+        header: 'صوت',
+        title: `${q}kbps`,
+        description: `تحميل صوت بجودة ${q}kbps`,
+        id: `${usedPrefix}${command} ${videoId}${SEP}audio${SEP}${q}`
+    }))
+
+    return { videoRows, audioRows }
+}
+
+async function sendQualityList(conn, chat, quoted, usedPrefix, command, videoId, title) {
+    const { videoRows, audioRows } = buildQualityRows(usedPrefix, command, videoId)
+    const titleLine = title ? `\nالعنوان: ${title}` : ''
+
+    const contentMsg = {
+        contentText: `اختر الجودة (مصدر احتياطي):${titleLine}`,
+        footerText: '© ʙʏ 𝙎𝙃𝘼𝙉𝙆𝙎',
+        buttons: [{
+            buttonId: `${usedPrefix}تحميل_قايمة`,
+            buttonText: { displayText: 'قايمة الجودات' },
+            type: 1,
+            nativeFlowInfo: {
+                name: 'single_select',
+                paramsJson: JSON.stringify({
+                    title: 'جودات احتياطية',
+                    sections: [{
+                        title: 'جودات الفيديو',
+                        highlight_label: `${videoRows.length} خيار`,
+                        rows: videoRows
+                    }, {
+                        title: 'جودات الصوت',
+                        highlight_label: `${audioRows.length} خيار`,
+                        rows: audioRows
+                    }]
+                })
+            }
+        }],
+        headerType: 1
+    }
+
+    const waMsg = generateWAMessageFromContent(chat, { buttonsMessage: contentMsg }, { quoted })
+    await conn.relayMessage(chat, waMsg.message, { messageId: waMsg.key.id })
+}
+
+const handler = async (m, { conn, args, usedPrefix, command }) => {
+    const rawInput = args.join(' ').trim()
+
+    if (!rawInput) {
+        return conn.sendMessage(m.chat, {
+            text: `🎬 تحميل من يوتيوب | 𝙎𝙃𝘼𝙉𝙆𝙎\n\n📌 الأوامر:\n• ${usedPrefix}${command} <رابط>\n• ${usedPrefix}${command} <بحث>\n\nمثال:\n${usedPrefix}${command} https://youtube.com/watch?v=xxx\n${usedPrefix}${command} anime edit`
+        }, { quoted: m })
+    }
+
+    const isUrl = /(?:youtube\.com|youtu\.be|m\.youtube\.com)/i.test(rawInput)
+    const parts = rawInput.split(SEP)
+
+    const isQuickChoice = parts.length === 3 && parts[1] === 'quick'
+    const isQualityChoice = parts.length === 3 && (parts[1] === 'video' || parts[1] === 'audio')
+    const isFallbackRequest = parts.length === 2 && parts[1] === 'fallback'
+    const isSearchResultSelection = parts.length === 2 && parts[1] === 'select'
+
+    if (isQuickChoice) {
+        const [videoId, , type] = parts
+        await conn.sendMessage(m.chat, { text: '⏳ جاري التحميل السريع...' }, { quoted: m })
+
+        try {
+            const payload = await fetchFromV2(`https://youtube.com/watch?v=${videoId}`, type)
+            await sendDownloadedMedia(conn, m.chat, payload, m)
+        } catch (e) {
+            await conn.sendMessage(m.chat, { text: `❌ ${e.message}\n\nجرب "جودات احتياطية" بدل كده` }, { quoted: m })
+        }
+        return
+    }
+
+    if (isQualityChoice) {
+        const [videoId, type, quality] = parts
+        await conn.sendMessage(m.chat, { text: '⏳ جاري التحميل...' }, { quoted: m })
+
+        try {
+            const payload = await fetchFromFallbackChain(`https://youtube.com/watch?v=${videoId}`, type, quality)
+            await sendDownloadedMedia(conn, m.chat, payload, m)
+        } catch (e) {
+            await conn.sendMessage(m.chat, { text: `❌ ${e.message}` }, { quoted: m })
+        }
+        return
+    }
+
+    if (isFallbackRequest) {
+        const [videoId] = parts
+        try {
+            const title = await axios.get(`https://www.youtube.com/oembed?url=https://youtube.com/watch?v=${videoId}&format=json`)
+                .then(r => r.data?.title || null)
+                .catch(() => null)
+
+            await sendQualityList(conn, m.chat, m, usedPrefix, command, videoId, title)
+        } catch (e) {
+            await conn.sendMessage(m.chat, { text: `❌ ${e.message}` }, { quoted: m })
+        }
+        return
+    }
+
+    if (isSearchResultSelection) {
+        const [videoId] = parts
+        try {
+            const title = await axios.get(`https://www.youtube.com/oembed?url=https://youtube.com/watch?v=${videoId}&format=json`)
+                .then(r => r.data?.title || null)
+                .catch(() => null)
+
+            await sendQuickChoiceButtons(conn, m.chat, m, usedPrefix, command, videoId, title)
+        } catch (e) {
+            await conn.sendMessage(m.chat, { text: `❌ ${e.message}` }, { quoted: m })
+        }
+        return
+    }
+
+    if (isUrl) {
+        const url = rawInput
+        await conn.sendMessage(m.chat, { text: '⏳ جاري جلب المعلومات...' }, { quoted: m })
+
+        try {
+            const videoId = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})(?:[&?]|$)/)?.[1]
+            if (!videoId) throw new Error('رابط غير صحيح')
+
+            const title = await axios.get(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`)
+                .then(r => r.data?.title || null)
+                .catch(() => null)
+
+            await sendQuickChoiceButtons(conn, m.chat, m, usedPrefix, command, videoId, title)
+        } catch (e) {
+            await conn.sendMessage(m.chat, { text: `❌ ${e.message}` }, { quoted: m })
+        }
+        return
+    }
+
+    await conn.sendMessage(m.chat, { text: `🔍 جاري البحث عن: ${rawInput}` }, { quoted: m })
+
+    try {
+        const results = await searchYouTube(rawInput)
+
+        if (results.length === 0) {
+            return conn.sendMessage(m.chat, { text: '❌ لا توجد نتائج' }, { quoted: m })
+        }
+
+        const sections = [{
+            title: '🎬 النتائج',
+            rows: results.slice(0, 10).map((video) => ({
+                title: (video.title || 'بدون عنوان').substring(0, 40),
+                description: `👤 ${video.author || 'غير معروف'} | 👁️ ${video.views || '-'} | ⏱️ ${video.duration || '-'}`,
+                id: `${usedPrefix}${command} ${video.id}${SEP}select`
+            }))
+        }]
+
+        const msg = generateWAMessageFromContent(m.chat, {
+            viewOnceMessage: {
+                message: {
+                    interactiveMessage: {
+                        body: { text: `🔍 *نتائج البحث عن:* ${rawInput}\n📊 *عدد النتائج:* ${results.length}\n\n👇 اختر الفيديو للتحميل:` },
+                        footer: { text: '© ʙʏ 𝙎𝙃𝘼𝙉𝙆𝙎' },
+                        nativeFlowMessage: {
+                            buttons: [{
+                                name: 'single_select',
+                                buttonParamsJson: JSON.stringify({
+                                    title: '📋 اختر فيديو',
+                                    sections
+                                })
+                            }]
+                        }
+                    }
+                }
+            }
+        }, { userJid: conn.user.jid, quoted: m })
+
+        await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id })
+    } catch (e) {
+        await conn.sendMessage(m.chat, { text: `❌ ${e.message}` }, { quoted: m })
+    }
+}
+
+handler.command = /^(يوتيوب|ytdl|يوت|بحث-يوتيوب)$/i
+handler.help = ['يوتيوب <رابط/بحث>']
+handler.tags = ['downloader']
+
+export default handler
