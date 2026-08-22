@@ -1,7 +1,7 @@
 /*╭━━━〔 CREDITS FOR 𝙎𝙃𝘼𝙉𝙆𝙎〕━━━╮
 │ 👑 الـمـطـور ↜ 𝙎𝙃𝘼𝙉𝙆𝙎
 │ 🌾 قــنــاة الــمــطـور ↜https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y 
-الوظيفه:جلب ايديت من التيك توك و اليوتيوب و بنتيرست 
+الوظيفه:جلب ايديت من التيك توك و اليوتيوب و بنتيرست
 ╰━━━━━━━━━━━━━━━━━━╯
 */
 
@@ -10,7 +10,7 @@ import axios from 'axios';
 import sharp from 'sharp';
 
 const API_BASE = 'https://engez.a7a.online/api/v1';
-const FOOTER = '𝙎𝙃𝘼𝙉𝙆𝙎🍷 𝙱𝙾𝚃';
+const FOOTER = '𝚂𝙷𝙰𝙽𝙺𝚂🍷 𝙱𝙾𝚃';
 
 const EDIT_IMAGE = 'https://files.catbox.moe/4yvat4.jpg';
 
@@ -18,11 +18,6 @@ const YT_SEARCH = `${API_BASE}/search/youtube`;
 const YT_DOWNLOAD_V2 = `${API_BASE}/download/youtubev2`;
 const YT_DOWNLOAD_NEW = `${API_BASE}/download/ytdl`;
 const YT_DOWNLOAD_OLD = `${API_BASE}/download/youtube`;
-
-
-/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  YOUTUBE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 function normalizeDownloadUrl(value) {
     if (typeof value !== 'string') return null;
@@ -237,10 +232,6 @@ async function fetchYtWithFallback(
             type
         );
     } catch (e) {
-        console.error(
-            'V2 فشل، بجرب ytdl:',
-            e?.message || e
-        );
     }
 
     try {
@@ -249,11 +240,6 @@ async function fetchYtWithFallback(
             type
         );
     } catch (e) {
-        console.error(
-            'ytdl فشل، بجرب youtube:',
-            e?.message || e
-        );
-
         return await fetchYtFromOldApi(
             url,
             type
@@ -382,11 +368,6 @@ async function runYoutubeEdit(
         }
     );
 }
-
-
-/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  TIKTOK
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 const TT_HEADERS = {
     'User-Agent':
@@ -645,11 +626,6 @@ async function runTikTokEdit(
     );
 }
 
-
-/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  PINTEREST
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
-
 const PINTEREST_ENDPOINT =
     `${API_BASE}/search/pinterest`;
 
@@ -887,11 +863,6 @@ async function runPinterestEdit(
         } catch (e) {
 
             lastError = e;
-
-            console.error(
-                '[ايديت-بينتر] فشل في محاولة بن:',
-                e.message
-            );
         }
     }
 
@@ -900,11 +871,6 @@ async function runPinterestEdit(
         'لم أتمكن من تحميل أي فيديو، جرب كلمة أخرى.'
     );
 }
-
-
-/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  IMAGE THUMBNAIL
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 async function getEditThumbnail() {
 
@@ -939,10 +905,6 @@ async function getEditThumbnail() {
             );
         }
 
-        /*
-         * تحويل الصورة إلى Thumbnail
-         * صغير وآمن للـ WhatsApp
-         */
         const thumbnail =
             await sharp(
                 imageBuffer
@@ -964,19 +926,9 @@ async function getEditThumbnail() {
 
     } catch (error) {
 
-        console.error(
-            '[EDIT IMAGE] فشل تجهيز الصورة:',
-            error?.message || error
-        );
-
         return null;
     }
 }
-
-
-/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  EDIT BUTTONS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 async function sendEditButtons(
     m,
@@ -985,10 +937,6 @@ async function sendEditButtons(
     input
 ) {
 
-    /*
-     * بنجيب الصورة ونحولها إلى
-     * JPEG Thumbnail Buffer صغير
-     */
     const thumbnail =
         await getEditThumbnail();
 
@@ -1002,11 +950,6 @@ async function sendEditButtons(
         address:
             'اختر نوع الإيديت',
 
-        /*
-         * لو الصورة اشتغلت نحطها،
-         * ولو فشل تحميلها نرسل الرسالة
-         * من غير thumbnail بدل ما البوت يقع.
-         */
         ...(thumbnail
             ? {
                 jpegThumbnail:
@@ -1088,11 +1031,6 @@ async function sendEditButtons(
     );
 }
 
-
-/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  HANDLER
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
-
 let handler = async (
     m,
     {
@@ -1107,11 +1045,6 @@ let handler = async (
         args.join(' ')
             .trim();
 
-
-    /*━━━━━━━━━━━━━━━━━━━━━━━━
-      MENU
-    ━━━━━━━━━━━━━━━━━━━━━━━━*/
-
     if (
         command === 'ايديت'
     ) {
@@ -1123,7 +1056,7 @@ let handler = async (
                 {
                     text:
                         `✧ اكتب مثلًا:\n` +
-                        `${usedPrefix}ايديت ايزانا`
+                        `${usedPrefix}ايديت شانكس`
                 },
                 {
                     quoted: m
@@ -1142,11 +1075,6 @@ let handler = async (
 
         } catch (e) {
 
-            console.error(
-                '[ايديت MENU ERROR]',
-                e
-            );
-
             await conn.sendMessage(
                 m.chat,
                 {
@@ -1162,11 +1090,6 @@ let handler = async (
         return;
     }
 
-
-    /*━━━━━━━━━━━━━━━━━━━━━━━━
-      CHECK INPUT
-    ━━━━━━━━━━━━━━━━━━━━━━━━*/
-
     if (!input) {
 
         return conn.sendMessage(
@@ -1180,11 +1103,6 @@ let handler = async (
             }
         );
     }
-
-
-    /*━━━━━━━━━━━━━━━━━━━━━━━━
-      RUN COMMAND
-    ━━━━━━━━━━━━━━━━━━━━━━━━*/
 
     try {
 
@@ -1221,11 +1139,6 @@ let handler = async (
 
     } catch (e) {
 
-        console.error(
-            `${command} error:`,
-            e
-        );
-
         await conn.sendMessage(
             m.chat,
             {
@@ -1238,11 +1151,6 @@ let handler = async (
         );
     }
 };
-
-
-/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  COMMANDS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 handler.command =
     /^(ايديت|ايديت-يوت|ايديت-تيك|ايديت-بينتر)$/i;
