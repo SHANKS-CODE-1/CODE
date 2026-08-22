@@ -1,11 +1,12 @@
 /*╭━━━〔 CREDITS FOR 𝙎𝙃𝘼𝙉𝙆𝙎〕━━━╮
 │ 👑 الـمـطـور ↜ 𝙎𝙃𝘼𝙉𝙆𝙎
 │ 🌾 قــنــاة الــمــطـور ↜https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y 
-الوظيفه: يعطيك FEN حق صوره الشطرنج
+الوظيفه: يعطيك FEN حق الشطرنج 
 ╰━━━━━━━━━━━━━━━━━━╯
 */
 
 import fetch from 'node-fetch';
+import { generateWAMessageFromContent } from '@whiskeysockets/baileys';
 
 const p1 = 'sk-or-v1-';
 const p2 = '09042705e4f0620a976199d4204463605d90cdffb2822299ce9812aa02c66e2d';
@@ -68,9 +69,47 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
         fenResult = fenResult.replace(/```[a-z]*/gi, '').replace(/```/g, '').trim();
 
-        const replyMessage = `♟️ *كود FEN لرقعة الشطرنج:*\n\n\`\`\`${fenResult}\`\`\`\n\n📌 يمكنك استخدام الكود في محركات الشطرنج مثل Lichess أو Stockfish.`;
+        let caption = `♟️ *كود FEN لرقعة الشطرنج:*\n\n\`\`\`${fenResult}\`\`\`\n\n📌 يمكنك استخدام الكود في محركات الشطرنج مثل Lichess أو Stockfish.`;
 
-        await m.reply(replyMessage);
+        const msg = generateWAMessageFromContent(m.chat, {
+            viewOnceMessage: {
+                message: {
+                    interactiveMessage: {
+                        body: { text: caption },
+                        footer: { text: "𝙎𝙃𝘼𝙉𝙆𝙎 𝘽𝙊𝙏 🍷" },
+                        nativeFlowMessage: {
+                            buttons: [
+                                {
+                                    name: "cta_copy",
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: "📋 نسخ الـ FEN",
+                                        copy_code: fenResult
+                                    })
+                                },
+                                {
+                                    name: "cta_url",
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: "🌐 Stockfish",
+                                        url: "https://stockfish.online/",
+                                        merchant_url: "https://stockfish.online/"
+                                    })
+                                },
+                                {
+                                    name: "cta_url",
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: "♟️ Lichess",
+                                        url: "https://lichess.org/analysis",
+                                        merchant_url: "https://lichess.org/analysis"
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }, { userJid: conn.user.id, quoted: m });
+
+        await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id });
         await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
 
     } catch (e) {
