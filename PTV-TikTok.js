@@ -19,7 +19,7 @@ const handler = async (m, { conn, text }) => {
 
     const filePath = `./temp-${senderId}.mp4`
     try {
-        const apiUrl = `https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(searchQuery)}&count=30`
+        const apiUrl = `const API_URL = 'https://2b.hidenfree.com'`
         const res = await axios.get(apiUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             timeout: 30000
