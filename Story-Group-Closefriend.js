@@ -1,7 +1,7 @@
 /*╭━━━〔 CREDITS FOR 𝙎𝙃𝘼𝙉𝙆𝙎〕━━━╮
 │ 👑 الـمـطـور ↜ 𝙎𝙃𝘼𝙉𝙆𝙎
-│ 🌾 قــنــاة الــمــطـور ↜https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y
-الوظيفه: ستوري جروب كلوز فريند تحكم في كل حاجه ايموجي شكل خط لون خط لون خلفيه كل شي 
+│ 🌾 قــنــاة الــمــطـور ↜https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y 
+الوظيفه: كلوز فريند لي قروبات الجديد v2
 ╰━━━━━━━━━━━━━━━━━━╯
 */
 
@@ -10,6 +10,7 @@ import {
     prepareWAMessageMedia,
     downloadContentFromMessage
 } from '@whiskeysockets/baileys'
+import crypto from 'crypto'
 
 const colorsList = [
     { name: 'احمر', hex: 'FF0000' },
@@ -64,7 +65,7 @@ const colorsList = [
     { name: 'بيج', hex: 'D2B48C' },
     { name: 'سيينا', hex: 'A0522D' },
     { name: 'زيتوني', hex: '808000' },
-    { name: 'برقوقي', hex: '673147' },
+    { name: 'بروقوقي', hex: '673147' },
     { name: 'مشمشي', hex: 'FBCEB1' },
     { name: 'كهرماني', hex: 'FFBF00' },
     { name: 'واتساب_داكن', hex: '075E54' },
@@ -109,7 +110,6 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
         let textHex = 'FFFFFF' 
         let selectedFont = 2  
 
-        
         let fullText = args.join(' ').trim()
 
         if (fullText.includes('@g.us')) {
@@ -120,8 +120,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
             }
         }
 
-        
-        let customEmoji = "🫦"
+        let customEmoji = "💜"
         const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})/u
         const emojiMatch = fullText.match(emojiRegex)
         if (emojiMatch) {
@@ -129,7 +128,6 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
             fullText = fullText.replace(customEmoji, '').trim()
         }
 
-        
         const paramsMatch = fullText.match(/^(\d+)\s+(\d+)\s+(\d+)/)
         
         if (paramsMatch) {
@@ -137,24 +135,19 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
             let fontInput = paramsMatch[2]
             let textInput = paramsMatch[3]
 
-            
             let bgIndex = parseInt(bgInput) - 1
             if (colorsList[bgIndex]) bgHex = colorsList[bgIndex].hex
 
-            
             if (fontStyles[fontInput] !== undefined) selectedFont = fontStyles[fontInput]
 
-            
             let textIndex = parseInt(textInput) - 1
             if (colorsList[textIndex]) textHex = colorsList[textIndex].hex
 
-            
             fullText = fullText.replace(/^(\d+)\s+(\d+)\s+(\d+)/, '').trim()
         }
 
         const text = fullText
 
-        // ─── فحص وجود الميديا (سواء بالرد أو مباشرة) ───
         let quoted = m.quoted ? m.quoted : null
         let mime = quoted?.mimetype || quoted?.msg?.mimetype || m.msg?.mimetype || ''
         
@@ -164,7 +157,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
 
         if (!isImage && !isVideo && !isAudio && !text) {
             return m.reply(
-`💜 *بوست شانكس🍷  (Close Friends)*\n━━━━━━━━━━━━━━━\n\n` +
+`💜 *بوست شانكس🍷 بالأرقام (Close Friends)*\n━━━━━━━━━━━━━━━\n\n` +
 `❌ الاستخدام الجديد:\n` +
 `${usedPrefix}${command} <الإيموجي> <رقم_الخلفية> <رقم_الخط> <رقم_لون_الخط> <النص>\n\n` +
 `💡 لعرض قائمة الألوان وأرقامها اكتب:\n` +
@@ -172,13 +165,18 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
             )
         }
 
-        const statusAudienceMetadata = {
-            audienceType: 2,
-            listName: "SHANKS🍷",
-            listEmoji: customEmoji
+        const contextInfo = {
+            statusSourceType: 4,
+            statusAttributions: [{ type: 10 }],
+            isGroupStatus: true,
+            statusAudienceMetadata: {
+                audienceType: 2,
+                listName: "شانكس🍷",
+                listEmoji: customEmoji
+            }
         }
 
-        let finalMediaMsg = {}
+        let innerMessage = {}
 
         if (isImage || isVideo || isAudio) {
             let mediaBuffer
@@ -198,47 +196,51 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
             if (!mediaBuffer) throw 'فشل تحميل الميديا من الرسالة!'
 
             let mediaOptions = isImage
-                ? { image: mediaBuffer, caption: text, contextInfo: { statusAudienceMetadata } }
+                ? { image: mediaBuffer, caption: text, contextInfo }
                 : isVideo
-                ? { video: mediaBuffer, caption: text, contextInfo: { statusAudienceMetadata } }
-                : { audio: mediaBuffer, mimetype: 'audio/mp4', ptt: true, contextInfo: { statusAudienceMetadata } }
+                ? { video: mediaBuffer, caption: text, contextInfo }
+                : { audio: mediaBuffer, mimetype: 'audio/mp4', ptt: true, contextInfo }
 
             let prepared = await prepareWAMessageMedia(mediaOptions, { upload: conn.waUploadToServer })
 
-            finalMediaMsg = isImage
-                ? { imageMessage: { ...prepared.imageMessage, contextInfo: { statusAudienceMetadata } } }
+            innerMessage = isImage
+                ? { imageMessage: { ...prepared.imageMessage, contextInfo } }
                 : isVideo
-                ? { videoMessage: { ...prepared.videoMessage, contextInfo: { statusAudienceMetadata } } }
-                : { audioMessage: { ...prepared.audioMessage, contextInfo: { statusAudienceMetadata } } }
+                ? { videoMessage: { ...prepared.videoMessage, contextInfo } }
+                : { audioMessage: { ...prepared.audioMessage, contextInfo } }
 
         } else {
-            finalMediaMsg = {
+            innerMessage = {
                 extendedTextMessage: {
                     text, 
                     backgroundArgb: parseInt('FF' + bgHex, 16),
                     textArgb: parseInt('FF' + textHex, 16), 
                     font: selectedFont,
-                    contextInfo: {
-                        statusAudienceMetadata: statusAudienceMetadata
-                    }
+                    contextInfo
                 }
             }
         }
 
-        let statusMsg = generateWAMessageFromContent(
-            targetJid,
-            {
-                groupStatusMessageV2: {
-                    message: finalMediaMsg
-                }
-            },
-            { userJid: conn.user.id }
-        )
+        const finalMessage = {
+            ...innerMessage,
+            messageContextInfo: {
+                messageSecret: crypto.randomBytes(32).toString('base64')
+            }
+        }
 
         await conn.relayMessage(
             targetJid,
-            statusMsg.message,
-            { messageId: statusMsg.key.id }
+            finalMessage,
+            {
+                additionalNodes: [
+                    {
+                        tag: "meta",
+                        attrs: {
+                            is_group_status: "true"
+                        }
+                    }
+                ]
+            }
         )
 
         await m.react('✅')
