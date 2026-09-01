@@ -1,5 +1,5 @@
-/*╭━━━〔 CREDITS FOR 𝙎𝙃𝘼𝙉𝙆𝙎〕━━━╮
-│ 👑 الـمـطـور ↜ 𝙎𝙃𝘼𝙉𝙆𝙎
+/*╭━━━〔 CREDITS FOR 𝕊ℍ𝔸ℕ𝕂𝕊〕━━━╮
+│ 👑 الـمـطـور ↜𝕊ℍ𝔸ℕ𝕂𝕊
 │ 🌾 قــنــاة الــمــطـور ↜https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y 
 الوظيفة: لعبه X O البروتوكول الجديد هتعجبك
 ╰━━━━━━━━━━━━━━━━━━╯
@@ -269,7 +269,7 @@ button:active{
     <div class="header">
 
       <div class="brand">
-        <small>NOX ARCADE</small>
+        <small>SHANKS ARCADE</small>
         <b>TIC TAC TOE</b>
       </div>
 
@@ -429,7 +429,6 @@ let losses=0;
 let draws=0;
 
 
-/* SOUND */
 
 let audioCtx=null;
 
@@ -618,7 +617,6 @@ function drawSound(){
 }
 
 
-/* GAME */
 
 const combinations=[
   [0,1,2],
@@ -1220,7 +1218,6 @@ function cpuMove(){
 }
 
 
-/* RESET */
 
 function startGame(){
 
