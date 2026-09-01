@@ -24,15 +24,15 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
             });
         };
 
-     
-        const htmlPayload = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n</head>\n<body style="margin:0;padding:0;background:transparent;">\n<pre style="font-family: monospace; font-size: 15px; font-weight: bold; white-space: pre-wrap; word-break: break-word; overflow-x: hidden;"><code>${inputText.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>\n</body>\n</html>`;
+        
+        const rawPayloadText = inputText.trim();
 
         const sectionsData = [
             {
                 view_model: {
                     primitive: {
                         __typename: "GenAIaeacdsnwHtmlPrimitive",
-                        payload: htmlPayload,
+                        payload: rawPayloadText,
                         trusted_sources: ["shanks.dev"]
                     },
                     __typename: "GenAISingleLayoutViewModel"
@@ -46,7 +46,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
                 submessages: [
                     {
                         messageType: 2,
-                        messageText: `\n✨ *النص الأسود المميز*\n`,
+                        messageText: `\n✨ *النص الأسود الاحترافي*\n`,
                     }
                 ],
                 unifiedResponse: {
@@ -78,7 +78,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
     } catch (e) {
         console.error(e);
-        m.reply("❌ حدث خطأ أثناء إرسال النص الأسود!");
+        m.reply("❌ حدث خطأ أثناء إرسال النص!");
     }
 };
 
