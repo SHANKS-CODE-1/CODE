@@ -1,167 +1,146 @@
 /*╭━━━〔 CREDITS FOR 𝙎𝙃𝘼𝙉𝙆𝙎〕━━━╮
 │ 👑 الـمـطـور ↜ 𝙎𝙃𝘼𝙉𝙆𝙎
-│ 🌾 قــنــاة الــمــطـور ↜https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y 
+│ 🌾 قــنــاة الــمــطـور ↜https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y
+ 📜 𝙏𝙝𝙞𝙨 𝙞𝙨 𝙩𝙝𝙚 𝙍𝙀𝙋𝙊 𝙡𝙞𝙣𝙠 𝙬𝙞𝙩𝙝 𝙖𝙡𝙡 𝙩𝙝𝙚 𝙘𝙤𝙙𝙚𝙨:
+⚡ https://github.com/SHANKS-CODE-1/CODE
+الوظيفه: بحث ايديت تيك توك
 ╰━━━━━━━━━━━━━━━━━━╯
-الوظيفه: بحث تيك توك و إرساله كاروسيل 
-حقوق ال Api: بروتوتايب
 */
 
-import axios from 'axios'
-import {
-  proto,
-  generateWAMessageFromContent,
-  generateWAMessageContent,
-} from "@whiskeysockets/baileys"
+import axios from 'axios';
+import { generateWAMessageFromContent, prepareWAMessageMedia } from '@whiskeysockets/baileys';
 
-const API_URL = 'https://2b.hidenfree.com'
+const botName = `⌁ 𝙎𝙃𝘼𝙉𝙆𝙎 ⌁`;
+const myCredit = `❄️ 𝚂𝙷𝙰𝙽𝙺𝚂`;
+const channelLink = `https://whatsapp.com/channel/0029VbC5LLx6GcGDXZUmHP0y`;
 
-let handler = async (m, { conn, args, usedPrefix, command }) => {
-  const chat = m.chat
+function contactQuote(m) {
+  return {
+    key: { participants: '0@s.whatsapp.net', remoteJid: 'status@broadcast', fromMe: false, id: 'NOXBOT' },
+    message: {
+      contactMessage: {
+        displayName: m.pushName || 'User',
+        vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${m.pushName || 'User'};;;;\nFN:${m.pushName || 'User'}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:📞 WhatsApp\nORG:${botName} ✓\nTITLE:Verified\nEND:VCARD`
+      }
+    },
+    participant: '0@s.whatsapp.net'
+  };
+}
 
-  if (!args[0]) {
-    await conn.sendMessage(chat, { react: { text: "❌", key: m.key } })
-    return m.reply(`*🎬 بـحـث الاديـتـات (𝚂𝙷𝙰𝙽𝙺𝚂 𝙱𝙾𝚃 )*\n\n📌 *الاستخدام:* ${usedPrefix}${command} <اسم الشخصية>\nمثال:\n• ${usedPrefix}${command} ناروتو\n• ${usedPrefix}${command} gojo\n• ${usedPrefix}${command} itachi`)
+async function getHDVideoBuffer(videoUrl) {
+  try {
+    const res = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(videoUrl)}`);
+    const data = res.data?.data;
+    
+    if (!data) return null;
+
+    const bestQualityUrl = data.hdplay || data.play;
+    if (!bestQualityUrl) return null;
+
+    const videoStream = await axios({
+      method: 'get',
+      url: bestQualityUrl,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      responseType: 'arraybuffer'
+    });
+
+    return Buffer.from(videoStream.data);
+  } catch (e) {
+    return null;
+  }
+}
+
+let handler = async (m, { conn, text, usedPrefix, command }) => {
+  const fkontak = contactQuote(m);
+
+  if (!text) {
+    return conn.reply(
+      m.chat, 
+      `ꕥ *${botName}* ꕥ\n\n📌 *يرجى إدخال كلمة البحث مع الأمر.*\n\n> ✦ *مثال:* ${usedPrefix + command} رصاصه رحمه`, 
+      fkontak
+    );
   }
 
-  const characterName = args.join(" ")
-  const searchQuery = `${characterName} edit`
-
-  await conn.sendMessage(chat, { react: { text: "🔍", key: m.key } })
+  await conn.reply(
+    m.chat, 
+    `⏳ *جاري البحث وسحب الفيديوهات بأعلى جودة (HD)...*`, 
+    fkontak
+  );
 
   try {
+    const searchRes = await axios.get(`https://www.monte-dev.online/api/search/tiktok-search?q=${encodeURIComponent(text)}`);
+    const videos = searchRes.data?.result?.videos || [];
 
-    const { data } = await axios.get(`${API_URL}/api/pinterest/search`, {
-      params: { q: searchQuery, type: 'video', limit: 5 },
-      timeout: 30000,
-      validateStatus: () => true
-    })
-
-    const videos = data?.results || []
-
-    if (!videos.length) {
-      await conn.sendMessage(chat, { react: { text: "❌", key: m.key } })
-      return m.reply(`❌ لم يتم العثور على أيديتات لـ: ${characterName}`)
+    if (videos.length === 0) {
+      return conn.reply(m.chat, `❌ *لم يتم العثور على أي نتائج.*`, fkontak);
     }
 
+    const topVideos = videos.slice(0, 5);
+    let cards = [];
 
-    const validVideos = []
-    
-    for (const v of videos) {
+    for (let vid of topVideos) {
       try {
-        const dlRes = await axios.get(`${API_URL}/api/pinterest/public`, {
-          params: { api_key: 'free_key', url: v.url, type: 'video' },
-          timeout: 300000,
-          validateStatus: () => true
-        })
+        const videoBuffer = await getHDVideoBuffer(vid.url);
+        if (!videoBuffer) continue;
 
-        if (dlRes.data?.success && dlRes.data?.fileKey) {
-          const fileRes = await axios.get(`${API_URL}/api/pinterest/download?file=${dlRes.data.fileKey}`, {
-            responseType: 'arraybuffer',
-            timeout: 300000,
-            validateStatus: () => true
-          })
+        let media = await prepareWAMessageMedia(
+          { video: videoBuffer },
+          { upload: conn.waUploadToServer }
+        );
 
-          const buffer = Buffer.from(fileRes.data)
-          
-          if (buffer.length > 1000) {
-            validVideos.push({
-              title: v.title || `${characterName} Edit 🎬`,
-              videoBuffer: buffer,
-              author: v.channel || v.author || 'غير معروف'
-            })
+        cards.push({
+          header: {
+            hasMediaAttachment: true,
+            videoMessage: media.videoMessage
+          },
+          body: {
+            text: `🎬 *صاحب المقطع:* ${vid.author?.name || 'غير معروف'}\n👁️ *المشاهدات:* ${vid.stats?.plays || 0} | ❤️ *الإعجابات:* ${vid.stats?.likes || 0}\n📝 *الوصف:* ${(vid.desc || 'بدون وصف').substring(0, 60)}...`
+          },
+          nativeFlowMessage: {
+            buttons: [
+              {
+                name: "cta_url",
+                buttonParamsJson: JSON.stringify({
+                  display_text: "📥 رابط الفيديو (HD)",
+                  url: vid.url,
+                  merchant_url: vid.url
+                })
+              }
+            ]
           }
-        }
-      } catch (e) {
-        console.error("خطأ أثناء معالجة فيديو فردي:", e.message)
+        });
+      } catch (err) {
       }
     }
 
-    if (!validVideos.length) throw new Error('تعذر تحميل أي من الفيديوهات المستخرجة.')
-
-
-    await sendCarousel(conn, chat, m, characterName, validVideos)
-
-    await conn.sendMessage(chat, { react: { text: "✅", key: m.key } })
-  } catch (err) {
-    console.error("❌ SHANKS Edit Error:", err)
-    await conn.sendMessage(chat, { react: { text: "❌", key: m.key } })
-    m.reply(`❌ حدث خطأ: ${err.message}`)
-  }
-}
-
-async function sendCarousel(conn, chat, m, characterName, videos) {
-  const cards = []
-
-  for (let i = 0; i < videos.length; i++) {
-    const video = videos[i]
-    try {
-      const { videoMessage } = await generateWAMessageContent(
-        { video: video.videoBuffer },
-        { upload: conn.waUploadToServer }
-      )
-
-      cards.push({
-        body: proto.Message.InteractiveMessage.Body.fromObject({
-          text: `👤 ${video.author}`,
-        }),
-        footer: proto.Message.InteractiveMessage.Footer.fromObject({
-          text: '❄️ SHANKS BOT',
-        }),
-        header: proto.Message.InteractiveMessage.Header.fromObject({
-          title: video.title.length > 50 ? video.title.substring(0, 47) + "..." : video.title,
-          hasMediaAttachment: true,
-          videoMessage: videoMessage,
-        }),
-        nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.fromObject({
-          buttons: [],
-        }),
-      })
-    } catch (err) {
-      console.log("Card error:", err.message)
+    if (cards.length === 0) {
+      return conn.reply(m.chat, `❌ *فشل تجهيز الفيديوهات.*`, fkontak);
     }
+
+    const msg = generateWAMessageFromContent(m.chat, {
+      viewOnceMessage: {
+        message: {
+          messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+          interactiveMessage: {
+            body: {
+              text: `✨ *نتائج بحث تيك توك (HD)* ✨\n\n🔎 *البحث:* ${text}\n📊 *العدد:* ${cards.length}\n\n📢 *قناة البوت:*\n${channelLink}`
+            },
+            footer: { text: `⌁ ${botName} ⌁\nBy ${myCredit}` },
+            carouselMessage: { cards }
+          }
+        }
+      }
+    }, { userJid: conn.user.jid, quoted: fkontak });
+
+    return await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id });
+
+  } catch (e) {
+    return conn.reply(m.chat, `❌ *حدث خطأ أثناء البحث:* ${e.message}`, fkontak);
   }
+};
 
-  if (cards.length === 0) throw new Error("لم يتم إنشاء أية كروت بنجاح")
-
-  const headerText = `
- ─── ✧  *SHANKS BOT*  ✧ ───
-
-       ♡ | 🎬 **اديتات: ${characterName}**
-       ⚡ | 📹 **فيديوهات: ${cards.length}**
-
- ─── ✧ ❄️ *SHANKS SYSTEM* 🍷 ───
-`.trim()
-
-  const msg = generateWAMessageFromContent(chat, {
-    viewOnceMessage: {
-      message: {
-        messageContextInfo: {
-          deviceListMetadata: {},
-          deviceListMetadataVersion: 2,
-        },
-        interactiveMessage: proto.Message.InteractiveMessage.fromObject({
-          body: proto.Message.InteractiveMessage.Body.create({
-            text: headerText,
-          }),
-          footer: proto.Message.InteractiveMessage.Footer.create({
-            text: '🍷 SHANKS BOT SYSTEM',
-          }),
-          header: proto.Message.InteractiveMessage.Header.create({
-            hasMediaAttachment: false,
-          }),
-          carouselMessage: proto.Message.InteractiveMessage.CarouselMessage.fromObject({
-            cards,
-          }),
-        }),
-      },
-    },
-  }, { quoted: m })
-
-  await conn.relayMessage(chat, msg.message, { messageId: msg.key.id })
-}
-
-handler.help = ["ايديت <اسم>"]
-handler.tags = ["downloader", 'anime']
-handler.command = /^(ايديت|edit|ايديتت|edits)$/i
-
-export default handler
+handler.command = /^(ايديت|بحث-تيك|tiktoksearch)$/i;
+handler.tags = ['downloader', 'search'];
+export default handler;
